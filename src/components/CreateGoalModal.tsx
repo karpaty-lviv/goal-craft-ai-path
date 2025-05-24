@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, Target } from "lucide-react";
+import { Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CreateGoalModalProps {
@@ -21,73 +20,7 @@ export const CreateGoalModal = ({ isOpen, onClose, onCreateGoal }: CreateGoalMod
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [targetDate, setTargetDate] = useState("");
-  const [useAI, setUseAI] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
-
-  const generateAIPlan = async (title: string, description: string): Promise<string[]> => {
-    // Simulate AI planning with realistic plans based on goal type
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
-    
-    const keywords = (title + " " + description).toLowerCase();
-    
-    if (keywords.includes("learn") || keywords.includes("study") || keywords.includes("course")) {
-      return [
-        "Research and gather learning resources",
-        "Create a structured study schedule",
-        "Start with fundamentals and basics",
-        "Practice with hands-on exercises",
-        "Build sample projects to apply knowledge",
-        "Join communities or find study partners",
-        "Take assessments to track progress",
-        "Complete advanced topics and specialization"
-      ];
-    } else if (keywords.includes("fitness") || keywords.includes("exercise") || keywords.includes("run") || keywords.includes("gym")) {
-      return [
-        "Assess current fitness level",
-        "Set up a workout schedule",
-        "Start with beginner-friendly exercises",
-        "Track daily activities and progress",
-        "Gradually increase intensity",
-        "Focus on proper nutrition",
-        "Monitor health metrics",
-        "Celebrate milestones and adjust goals"
-      ];
-    } else if (keywords.includes("business") || keywords.includes("startup") || keywords.includes("company")) {
-      return [
-        "Conduct market research",
-        "Develop a business plan",
-        "Secure initial funding or investment",
-        "Build a minimum viable product",
-        "Test with early customers",
-        "Iterate based on feedback",
-        "Scale operations and marketing",
-        "Establish sustainable growth"
-      ];
-    } else if (keywords.includes("save") || keywords.includes("money") || keywords.includes("financial")) {
-      return [
-        "Analyze current spending habits",
-        "Create a detailed budget plan",
-        "Set up automatic savings",
-        "Cut unnecessary expenses",
-        "Find additional income sources",
-        "Track progress monthly",
-        "Adjust strategy as needed",
-        "Reach your financial target"
-      ];
-    } else {
-      return [
-        "Break down the goal into smaller tasks",
-        "Research best practices and strategies",
-        "Create a timeline and milestones",
-        "Start with the most important tasks",
-        "Track progress regularly",
-        "Adjust approach based on results",
-        "Stay consistent with daily actions",
-        "Complete the goal and celebrate"
-      ];
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,37 +34,16 @@ export const CreateGoalModal = ({ isOpen, onClose, onCreateGoal }: CreateGoalMod
       return;
     }
 
-    let plan: string[] = [];
-    
-    if (useAI) {
-      setIsGenerating(true);
-      try {
-        plan = await generateAIPlan(title, description);
-        toast({
-          title: "Success!",
-          description: "AI has generated a personalized plan for your goal",
-        });
-      } catch (error) {
-        toast({
-          title: "Warning",
-          description: "Failed to generate AI plan. Creating goal with empty plan.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsGenerating(false);
-      }
-    }
-
     const newGoal = {
       title: title.trim(),
       description: description.trim(),
       category,
       targetDate,
       progress: 0,
-      totalSteps: plan.length || 0,
+      totalSteps: 0,
       completedSteps: 0,
       isCompleted: false,
-      plan
+      plan: []
     };
 
     onCreateGoal(newGoal);
@@ -141,7 +53,11 @@ export const CreateGoalModal = ({ isOpen, onClose, onCreateGoal }: CreateGoalMod
     setDescription("");
     setCategory("");
     setTargetDate("");
-    setUseAI(false);
+
+    toast({
+      title: "Goal Created!",
+      description: "Your goal has been created. You can now add steps or generate an AI plan.",
+    });
   };
 
   return (
@@ -211,23 +127,6 @@ export const CreateGoalModal = ({ isOpen, onClose, onCreateGoal }: CreateGoalMod
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border">
-            <Checkbox
-              id="useAI"
-              checked={useAI}
-              onCheckedChange={(checked) => setUseAI(checked as boolean)}
-            />
-            <div className="flex-1">
-              <Label htmlFor="useAI" className="flex items-center gap-2 cursor-pointer">
-                <Sparkles className="h-4 w-4 text-purple-600" />
-                Create a plan using artificial intelligence
-              </Label>
-              <p className="text-xs text-gray-600 mt-1">
-                AI will analyze your goal and create a step-by-step plan to help you achieve it
-              </p>
-            </div>
-          </div>
-
           <div className="flex gap-3 pt-4">
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancel
@@ -235,16 +134,8 @@ export const CreateGoalModal = ({ isOpen, onClose, onCreateGoal }: CreateGoalMod
             <Button 
               type="submit" 
               className="flex-1 bg-blue-600 hover:bg-blue-700"
-              disabled={isGenerating}
             >
-              {isGenerating ? (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2 animate-spin" />
-                  Generating Plan...
-                </>
-              ) : (
-                "Create Goal"
-              )}
+              Create Goal
             </Button>
           </div>
         </form>

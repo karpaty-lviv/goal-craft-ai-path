@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Calendar, Target, Trophy, CheckCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Calendar, Target, Trophy, CheckCircle, Plus, Trash2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Goal {
@@ -27,6 +27,8 @@ const GoalDetail = () => {
   const { id } = useParams();
   const [goal, setGoal] = useState<Goal | null>(null);
   const [completedPlanSteps, setCompletedPlanSteps] = useState<Set<number>>(new Set());
+  const [newStep, setNewStep] = useState("");
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,6 +49,91 @@ const GoalDetail = () => {
     }
   }, [id]);
 
+  const generateAIPlan = async (title: string, description: string, existingSteps: string[]): Promise<string[]> => {
+    // Simulate AI planning with realistic plans based on goal type
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+    
+    const keywords = (title + " " + description).toLowerCase();
+    let aiSteps: string[] = [];
+    
+    if (keywords.includes("learn") || keywords.includes("study") || keywords.includes("course")) {
+      aiSteps = [
+        "Research and gather learning resources",
+        "Create a structured study schedule",
+        "Start with fundamentals and basics",
+        "Practice with hands-on exercises",
+        "Build sample projects to apply knowledge",
+        "Join communities or find study partners",
+        "Take assessments to track progress",
+        "Complete advanced topics and specialization"
+      ];
+    } else if (keywords.includes("fitness") || keywords.includes("exercise") || keywords.includes("run") || keywords.includes("gym")) {
+      aiSteps = [
+        "Assess current fitness level",
+        "Set up a workout schedule",
+        "Start with beginner-friendly exercises",
+        "Track daily activities and progress",
+        "Gradually increase intensity",
+        "Focus on proper nutrition",
+        "Monitor health metrics",
+        "Celebrate milestones and adjust goals"
+      ];
+    } else if (keywords.includes("business") || keywords.includes("startup") || keywords.includes("company")) {
+      aiSteps = [
+        "Conduct market research",
+        "Develop a business plan",
+        "Secure initial funding or investment",
+        "Build a minimum viable product",
+        "Test with early customers",
+        "Iterate based on feedback",
+        "Scale operations and marketing",
+        "Establish sustainable growth"
+      ];
+    } else if (keywords.includes("save") || keywords.includes("money") || keywords.includes("financial")) {
+      aiSteps = [
+        "Analyze current spending habits",
+        "Create a detailed budget plan",
+        "Set up automatic savings",
+        "Cut unnecessary expenses",
+        "Find additional income sources",
+        "Track progress monthly",
+        "Adjust strategy as needed",
+        "Reach your financial target"
+      ];
+    } else {
+      aiSteps = [
+        "Break down the goal into smaller tasks",
+        "Research best practices and strategies",
+        "Create a timeline and milestones",
+        "Start with the most important tasks",
+        "Track progress regularly",
+        "Adjust approach based on results",
+        "Stay consistent with daily actions",
+        "Complete the goal and celebrate"
+      ];
+    }
+
+    // Filter out steps that are too similar to existing ones
+    const newSteps = aiSteps.filter(aiStep => 
+      !existingSteps.some(existingStep => 
+        existingStep.toLowerCase().includes(aiStep.toLowerCase().split(' ').slice(0, 3).join(' ')) ||
+        aiStep.toLowerCase().includes(existingStep.toLowerCase().split(' ').slice(0, 3).join(' '))
+      )
+    );
+
+    return [...existingSteps, ...newSteps];
+  };
+
+  const updateGoalInStorage = (updatedGoal: Goal) => {
+    const savedGoals = localStorage.getItem('goals');
+    if (savedGoals) {
+      const goals: Goal[] = JSON.parse(savedGoals);
+      const updatedGoals = goals.map(g => g.id === id ? updatedGoal : g);
+      localStorage.setItem('goals', JSON.stringify(updatedGoals));
+      setGoal(updatedGoal);
+    }
+  };
+
   const handleStepToggle = (stepIndex: number, isChecked: boolean) => {
     const newCompletedSteps = new Set(completedPlanSteps);
     
@@ -59,29 +146,121 @@ const GoalDetail = () => {
     setCompletedPlanSteps(newCompletedSteps);
     
     if (goal) {
-      const newProgress = Math.round((newCompletedSteps.size / goal.plan.length) * 100);
+      const newProgress = goal.plan.length === 0 ? 0 : Math.round((newCompletedSteps.size / goal.plan.length) * 100);
       const updatedGoal = {
         ...goal,
         progress: newProgress,
         completedSteps: newCompletedSteps.size,
-        isCompleted: newProgress === 100
+        totalSteps: goal.plan.length,
+        isCompleted: newProgress === 100 && goal.plan.length > 0
       };
       
-      // Update localStorage
-      const savedGoals = localStorage.getItem('goals');
-      if (savedGoals) {
-        const goals: Goal[] = JSON.parse(savedGoals);
-        const updatedGoals = goals.map(g => g.id === id ? updatedGoal : g);
-        localStorage.setItem('goals', JSON.stringify(updatedGoals));
-        setGoal(updatedGoal);
-        
-        if (newProgress === 100 && !goal.isCompleted) {
-          toast({
-            title: "🎉 Congratulations!",
-            description: "You've completed your goal! Great work!",
-          });
-        }
+      updateGoalInStorage(updatedGoal);
+      
+      if (newProgress === 100 && !goal.isCompleted && goal.plan.length > 0) {
+        toast({
+          title: "🎉 Congratulations!",
+          description: "You've completed your goal! Great work!",
+        });
       }
+    }
+  };
+
+  const handleAddStep = () => {
+    if (!newStep.trim() || !goal) return;
+    
+    const updatedPlan = [...goal.plan, newStep.trim()];
+    const updatedGoal = {
+      ...goal,
+      plan: updatedPlan,
+      totalSteps: updatedPlan.length
+    };
+    
+    updateGoalInStorage(updatedGoal);
+    setNewStep("");
+    
+    toast({
+      title: "Step added",
+      description: "New step has been added to your plan",
+    });
+  };
+
+  const handleDeleteStep = (stepIndex: number) => {
+    if (!goal) return;
+    
+    const updatedPlan = goal.plan.filter((_, index) => index !== stepIndex);
+    const newCompletedSteps = new Set<number>();
+    
+    // Adjust completed steps indices
+    completedPlanSteps.forEach(completedIndex => {
+      if (completedIndex < stepIndex) {
+        newCompletedSteps.add(completedIndex);
+      } else if (completedIndex > stepIndex) {
+        newCompletedSteps.add(completedIndex - 1);
+      }
+    });
+    
+    setCompletedPlanSteps(newCompletedSteps);
+    
+    const newProgress = updatedPlan.length === 0 ? 0 : Math.round((newCompletedSteps.size / updatedPlan.length) * 100);
+    const updatedGoal = {
+      ...goal,
+      plan: updatedPlan,
+      totalSteps: updatedPlan.length,
+      progress: newProgress,
+      completedSteps: newCompletedSteps.size,
+      isCompleted: newProgress === 100 && updatedPlan.length > 0
+    };
+    
+    updateGoalInStorage(updatedGoal);
+    
+    toast({
+      title: "Step deleted",
+      description: "Step has been removed from your plan",
+    });
+  };
+
+  const handleGenerateAIPlan = async () => {
+    if (!goal) return;
+    
+    setIsGeneratingPlan(true);
+    try {
+      const newPlan = await generateAIPlan(goal.title, goal.description, goal.plan);
+      
+      // Reset completed steps for new plan
+      const newCompletedSteps = new Set<number>();
+      completedPlanSteps.forEach(completedIndex => {
+        if (completedIndex < goal.plan.length) {
+          newCompletedSteps.add(completedIndex);
+        }
+      });
+      
+      setCompletedPlanSteps(newCompletedSteps);
+      
+      const newProgress = newPlan.length === 0 ? 0 : Math.round((newCompletedSteps.size / newPlan.length) * 100);
+      const updatedGoal = {
+        ...goal,
+        plan: newPlan,
+        totalSteps: newPlan.length,
+        progress: newProgress,
+        completedSteps: newCompletedSteps.size,
+        isCompleted: newProgress === 100 && newPlan.length > 0
+      };
+      
+      updateGoalInStorage(updatedGoal);
+      
+      toast({
+        title: "AI Plan Generated!",
+        description: `AI has added ${newPlan.length - goal.plan.length} new steps to your plan`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate AI plan. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPlan(false);
     }
   };
 
@@ -193,63 +372,100 @@ const GoalDetail = () => {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5" />
-                  Action Plan
-                  {goal.plan.length === 0 && (
-                    <Badge variant="outline">Custom Plan</Badge>
-                  )}
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5" />
+                    Action Plan
+                  </CardTitle>
+                  <Button
+                    onClick={handleGenerateAIPlan}
+                    disabled={isGeneratingPlan}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {isGeneratingPlan ? (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate AI Plan
+                      </>
+                    )}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
-                {goal.plan.length > 0 ? (
-                  <div className="space-y-3">
-                    {goal.plan.map((step, index) => (
-                      <div
-                        key={index}
-                        className={`flex items-start gap-3 p-4 rounded-lg border transition-all ${
-                          completedPlanSteps.has(index)
-                            ? 'bg-green-50 border-green-200'
-                            : 'bg-white border-gray-200 hover:border-blue-300'
-                        }`}
-                      >
-                        <Checkbox
-                          checked={completedPlanSteps.has(index)}
-                          onCheckedChange={(checked) => handleStepToggle(index, checked as boolean)}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium text-gray-500">
-                              Step {index + 1}
-                            </span>
-                            {completedPlanSteps.has(index) && (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            )}
-                          </div>
-                          <p className={`${
-                            completedPlanSteps.has(index)
-                              ? 'text-green-700 line-through'
-                              : 'text-gray-900'
-                          }`}>
-                            {step}
-                          </p>
+                <div className="space-y-4">
+                  {/* Existing Steps */}
+                  {goal.plan.map((step, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-start gap-3 p-4 rounded-lg border transition-all ${
+                        completedPlanSteps.has(index)
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-white border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={completedPlanSteps.has(index)}
+                        onCheckedChange={(checked) => handleStepToggle(index, checked as boolean)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-gray-500">
+                            Step {index + 1}
+                          </span>
+                          {completedPlanSteps.has(index) && (
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                          )}
                         </div>
+                        <p className={`${
+                          completedPlanSteps.has(index)
+                            ? 'text-green-700 line-through'
+                            : 'text-gray-900'
+                        }`}>
+                          {step}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Target className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No plan yet</h3>
-                    <p className="text-gray-600 mb-4">
-                      This goal was created without an AI-generated plan. You can add your own steps manually.
-                    </p>
-                    <Button variant="outline">
-                      Add Custom Steps
+                      <Button
+                        onClick={() => handleDeleteStep(index)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  {/* Add New Step */}
+                  <div className="flex gap-2 p-4 border-2 border-dashed border-gray-200 rounded-lg">
+                    <Input
+                      placeholder="Add a new step to your plan..."
+                      value={newStep}
+                      onChange={(e) => setNewStep(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddStep()}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleAddStep} disabled={!newStep.trim()}>
+                      <Plus className="h-4 w-4" />
                     </Button>
                   </div>
-                )}
+
+                  {goal.plan.length === 0 && (
+                    <div className="text-center py-8">
+                      <Target className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Start planning your goal</h3>
+                      <p className="text-gray-600 mb-4">
+                        Add your own steps or use AI to generate a personalized plan
+                      </p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
