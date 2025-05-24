@@ -6,8 +6,10 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Calendar, Target, Trophy, CheckCircle, Plus, Trash2, Sparkles } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Calendar, Target, Trophy, CheckCircle, Plus, Trash2, Sparkles, Edit3, Save, X, GripVertical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 interface Goal {
   id: string;
@@ -29,6 +31,11 @@ const GoalDetail = () => {
   const [completedPlanSteps, setCompletedPlanSteps] = useState<Set<number>>(new Set());
   const [newStep, setNewStep] = useState("");
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [editingStep, setEditingStep] = useState<number | null>(null);
+  const [editingStepText, setEditingStepText] = useState("");
+  const [editGoalTitle, setEditGoalTitle] = useState("");
+  const [editGoalDescription, setEditGoalDescription] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -132,6 +139,106 @@ const GoalDetail = () => {
       localStorage.setItem('goals', JSON.stringify(updatedGoals));
       setGoal(updatedGoal);
     }
+  };
+
+  const handleEditGoal = () => {
+    if (!goal) return;
+    setEditGoalTitle(goal.title);
+    setEditGoalDescription(goal.description);
+    setEditingGoal(true);
+  };
+
+  const handleSaveGoal = () => {
+    if (!goal || !editGoalTitle.trim() || !editGoalDescription.trim()) return;
+    
+    const updatedGoal = {
+      ...goal,
+      title: editGoalTitle.trim(),
+      description: editGoalDescription.trim()
+    };
+    
+    updateGoalInStorage(updatedGoal);
+    setEditingGoal(false);
+    
+    toast({
+      title: "Goal updated",
+      description: "Goal details have been saved",
+    });
+  };
+
+  const handleCancelEditGoal = () => {
+    setEditingGoal(false);
+    setEditGoalTitle("");
+    setEditGoalDescription("");
+  };
+
+  const handleEditStep = (stepIndex: number, stepText: string) => {
+    setEditingStep(stepIndex);
+    setEditingStepText(stepText);
+  };
+
+  const handleSaveStep = () => {
+    if (!goal || editingStep === null || !editingStepText.trim()) return;
+    
+    const updatedPlan = [...goal.plan];
+    updatedPlan[editingStep] = editingStepText.trim();
+    
+    const updatedGoal = {
+      ...goal,
+      plan: updatedPlan
+    };
+    
+    updateGoalInStorage(updatedGoal);
+    setEditingStep(null);
+    setEditingStepText("");
+    
+    toast({
+      title: "Step updated",
+      description: "Step has been saved",
+    });
+  };
+
+  const handleCancelEditStep = () => {
+    setEditingStep(null);
+    setEditingStepText("");
+  };
+
+  const handleDragEnd = (result: any) => {
+    if (!result.destination || !goal) return;
+    
+    const items = Array.from(goal.plan);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    
+    // Update completed steps indices
+    const newCompletedSteps = new Set<number>();
+    completedPlanSteps.forEach(completedIndex => {
+      // Find where this step moved to
+      let newIndex = completedIndex;
+      if (completedIndex === result.source.index) {
+        newIndex = result.destination.index;
+      } else if (completedIndex > result.source.index && completedIndex <= result.destination.index) {
+        newIndex = completedIndex - 1;
+      } else if (completedIndex < result.source.index && completedIndex >= result.destination.index) {
+        newIndex = completedIndex + 1;
+      }
+      newCompletedSteps.add(newIndex);
+    });
+    
+    setCompletedPlanSteps(newCompletedSteps);
+    
+    const updatedGoal = {
+      ...goal,
+      plan: items,
+      completedSteps: newCompletedSteps.size
+    };
+    
+    updateGoalInStorage(updatedGoal);
+    
+    toast({
+      title: "Steps reordered",
+      description: "Step order has been updated",
+    });
   };
 
   const handleStepToggle = (stepIndex: number, isChecked: boolean) => {
@@ -306,8 +413,47 @@ const GoalDetail = () => {
         <div className="mb-8">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{goal.title}</h1>
-              <p className="text-lg text-gray-600">{goal.description}</p>
+              {editingGoal ? (
+                <div className="space-y-4">
+                  <div>
+                    <Input
+                      value={editGoalTitle}
+                      onChange={(e) => setEditGoalTitle(e.target.value)}
+                      className="text-3xl font-bold border-none p-0 focus-visible:ring-0 bg-transparent"
+                      placeholder="Goal title..."
+                    />
+                  </div>
+                  <div>
+                    <Textarea
+                      value={editGoalDescription}
+                      onChange={(e) => setEditGoalDescription(e.target.value)}
+                      className="text-lg border-none p-0 focus-visible:ring-0 bg-transparent resize-none"
+                      placeholder="Goal description..."
+                      rows={2}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleSaveGoal} size="sm">
+                      <Save className="h-4 w-4 mr-2" />
+                      Save
+                    </Button>
+                    <Button onClick={handleCancelEditGoal} variant="outline" size="sm">
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h1 className="text-3xl font-bold text-gray-900">{goal.title}</h1>
+                    <Button onClick={handleEditGoal} variant="ghost" size="sm">
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-lg text-gray-600">{goal.description}</p>
+                </div>
+              )}
             </div>
             {goal.isCompleted && (
               <div className="flex items-center gap-2 text-green-600">
@@ -399,48 +545,95 @@ const GoalDetail = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Existing Steps */}
-                  {goal.plan.map((step, index) => (
-                    <div
-                      key={index}
-                      className={`flex items-start gap-3 p-4 rounded-lg border transition-all ${
-                        completedPlanSteps.has(index)
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-white border-gray-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <Checkbox
-                        checked={completedPlanSteps.has(index)}
-                        onCheckedChange={(checked) => handleStepToggle(index, checked as boolean)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-gray-500">
-                            Step {index + 1}
-                          </span>
-                          {completedPlanSteps.has(index) && (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          )}
+                  <DragDropContext onDragEnd={handleDragEnd}>
+                    <Droppable droppableId="steps">
+                      {(provided) => (
+                        <div {...provided.droppableProps} ref={provided.innerRef}>
+                          {goal.plan.map((step, index) => (
+                            <Draggable key={index} draggableId={index.toString()} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  className={`flex items-start gap-3 p-4 rounded-lg border transition-all mb-3 ${
+                                    completedPlanSteps.has(index)
+                                      ? 'bg-green-50 border-green-200'
+                                      : 'bg-white border-gray-200 hover:border-blue-300'
+                                  } ${snapshot.isDragging ? 'shadow-lg' : ''}`}
+                                >
+                                  <div {...provided.dragHandleProps} className="mt-1 cursor-grab active:cursor-grabbing">
+                                    <GripVertical className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                  <Checkbox
+                                    checked={completedPlanSteps.has(index)}
+                                    onCheckedChange={(checked) => handleStepToggle(index, checked as boolean)}
+                                    className="mt-1"
+                                  />
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-sm font-medium text-gray-500">
+                                        Step {index + 1}
+                                      </span>
+                                      {completedPlanSteps.has(index) && (
+                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                      )}
+                                    </div>
+                                    {editingStep === index ? (
+                                      <div className="space-y-2">
+                                        <Input
+                                          value={editingStepText}
+                                          onChange={(e) => setEditingStepText(e.target.value)}
+                                          onKeyPress={(e) => e.key === 'Enter' && handleSaveStep()}
+                                          className="text-sm"
+                                        />
+                                        <div className="flex gap-2">
+                                          <Button onClick={handleSaveStep} size="sm" variant="outline">
+                                            <Save className="h-3 w-3 mr-1" />
+                                            Save
+                                          </Button>
+                                          <Button onClick={handleCancelEditStep} size="sm" variant="ghost">
+                                            <X className="h-3 w-3 mr-1" />
+                                            Cancel
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <p className={`flex-1 ${
+                                          completedPlanSteps.has(index)
+                                            ? 'text-green-700 line-through'
+                                            : 'text-gray-900'
+                                        }`}>
+                                          {step}
+                                        </p>
+                                        <Button
+                                          onClick={() => handleEditStep(index, step)}
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-gray-500 hover:text-gray-700"
+                                        >
+                                          <Edit3 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Button
+                                    onClick={() => handleDeleteStep(index)}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
                         </div>
-                        <p className={`${
-                          completedPlanSteps.has(index)
-                            ? 'text-green-700 line-through'
-                            : 'text-gray-900'
-                        }`}>
-                          {step}
-                        </p>
-                      </div>
-                      <Button
-                        onClick={() => handleDeleteStep(index)}
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                      )}
+                    </Droppable>
+                  </DragDropContext>
 
                   {/* Add New Step */}
                   <div className="flex gap-2 p-4 border-2 border-dashed border-gray-200 rounded-lg">
